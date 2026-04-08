@@ -10,7 +10,15 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev \
     libicu-dev \
-    && docker-php-ext-install pdo pdo_mysql zip \
+    && docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    zip \
+    mbstring \
+    xml \
+    bcmath \
+    exif \
+    intl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,7 +26,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
 EXPOSE 10000
 
