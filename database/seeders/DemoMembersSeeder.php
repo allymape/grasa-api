@@ -16,6 +16,7 @@ use App\Models\ProfilePhoto;
 use App\Models\Region;
 use App\Models\User;
 use Faker\Generator;
+use Faker\Factory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -108,7 +109,7 @@ class DemoMembersSeeder extends Seeder
             throw new \RuntimeException('Demo member gender counts must total exactly 100.');
         }
 
-        $this->faker = fake();
+        $this->faker = Factory::create();
         $this->faker->seed(20260408);
 
         $countries = Country::query()
