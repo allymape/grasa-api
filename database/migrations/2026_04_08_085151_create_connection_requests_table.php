@@ -33,7 +33,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_pair_max_id')->storedAs(
                 'CASE WHEN sender_id > receiver_id THEN sender_id ELSE receiver_id END'
             );
-            $table->boolean('is_active')->storedAs(
+            $table->string('is_active')->storedAs(
                 "CASE WHEN status IN ('pending','accepted','payment_pending','partially_paid','connected') THEN 1 ELSE 0 END"
             );
             $table->string('active_status_key')->nullable()->storedAs(
