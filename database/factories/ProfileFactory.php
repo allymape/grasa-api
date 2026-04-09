@@ -14,6 +14,7 @@ use App\Models\Profile;
 use App\Models\Region;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Carbon;
 
 /**
  * @extends Factory<Profile>
@@ -48,11 +49,14 @@ class ProfileFactory extends Factory
 
         $employment = fake()->randomElement(array_column(EmploymentStatus::cases(), 'value'));
         $hasChildren = fake()->boolean(38);
+        $dateOfBirth = Carbon::instance(fake()->dateTimeBetween('-48 years', '-18 years'));
+        $age = $dateOfBirth->age;
 
         return [
             'user_id' => User::factory(),
             'display_name' => fake()->firstName().' '.fake()->lastName(),
-            'age' => fake()->numberBetween(18, 48),
+            'age' => $age,
+            'date_of_birth' => $dateOfBirth->toDateString(),
             'country_id' => $country?->id ?? Country::query()->value('id'),
             'region_id' => $regionId,
             'district_id' => $districtId,

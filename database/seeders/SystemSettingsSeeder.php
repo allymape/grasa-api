@@ -17,5 +17,21 @@ class SystemSettingsSeeder extends Seeder
                 'updated_by' => null,
             ]
         );
+
+        SystemSetting::query()->updateOrCreate(
+            ['key' => SystemSettingService::MALE_MIN_AGE_KEY],
+            [
+                'value' => (string) SystemSettingService::DEFAULT_MALE_MIN_AGE,
+                'updated_by' => null,
+            ]
+        );
+
+        SystemSetting::query()->updateOrCreate(
+            ['key' => SystemSettingService::FEMALE_MIN_AGE_KEY],
+            [
+                'value' => (string) SystemSettingService::DEFAULT_FEMALE_MIN_AGE,
+                'updated_by' => null,
+            ]
+        );
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Requests\Api\UpsertProfileRequest;
 use App\Models\Profile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ProfileController extends ApiController
@@ -34,6 +35,22 @@ class ProfileController extends ApiController
         $user = $request->user();
         $validated = $request->validated();
 
+        $dateOfBirth = isset($validated['date_of_birth']) && $validated['date_of_birth'] !== null
+            ? Carbon::parse((string) $validated['date_of_birth'])->toDateString()
+            : null;
+
+        if (! $dateOfBirth && isset($validated['age'])) {
+            $dateOfBirth = Carbon::today()->subYears((int) $validated['age'])->toDateString();
+        }
+
+        if (! $dateOfBirth) {
+            return $this->error('Date of birth is required.', 422, [
+                'date_of_birth' => ['Date of birth is required.'],
+            ]);
+        }
+
+        $validated['date_of_birth'] = $dateOfBirth;
+        $validated['age'] = Carbon::parse($dateOfBirth)->age;
         $validated['has_children'] = (bool) $validated['has_children'];
         $validated['children_count'] = $validated['has_children'] ? (int) $validated['children_count'] : 0;
         $validated['is_visible'] = (bool) ($validated['is_visible'] ?? true);
@@ -83,7 +100,7 @@ class ProfileController extends ApiController
             'id' => $profile->id,
             'user_id' => $profile->user_id,
             'display_name' => $profile->display_name,
-            'age' => $profile->age,
+            'age' => (int) $profile->age,
             'country_id' => $profile->country_id,
             'region_id' => $profile->region_id,
             'district_id' => $profile->district_id,

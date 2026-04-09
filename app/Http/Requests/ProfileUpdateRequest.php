@@ -2,8 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\Gender;
+use App\Services\SystemSettingService;
+use Carbon\Carbon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class ProfileUpdateRequest extends FormRequest
 {
@@ -21,7 +25,8 @@ class ProfileUpdateRequest extends FormRequest
     {
         return [
             'display_name' => ['required', 'string', 'max:100'],
-            'age' => ['required', 'integer', 'min:18', 'max:80'],
+            'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'age' => ['nullable', 'integer', 'min:1', 'max:100'],
             'region' => ['required', 'string', 'max:100'],
             'district' => ['nullable', 'string', 'max:100'],
             'current_residence' => ['required', 'string', 'max:150'],
@@ -41,5 +46,48 @@ class ProfileUpdateRequest extends FormRequest
             'photos.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'primary_photo_id' => ['nullable', 'integer', 'exists:profile_photos,id'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            /** @var array<string, mixed> $data */
+            $data = $this->all();
+            $minimumAge = $this->minimumAgeForCurrentUser();
+            $minimumAgeMessage = $this->minimumAgeMessage($minimumAge);
+
+            if (empty($data['date_of_birth']) && ! isset($data['age'])) {
+                $validator->errors()->add('date_of_birth', 'Date of birth is required.');
+            } elseif (! empty($data['date_of_birth'])) {
+                try {
+                    $calculatedAge = Carbon::parse((string) $data['date_of_birth'])->age;
+                    if ($calculatedAge < $minimumAge) {
+                        $validator->errors()->add('date_of_birth', $minimumAgeMessage);
+                    }
+                } catch (\Throwable) {
+                    // Date format validation is handled by the date rule.
+                }
+            } elseif ((int) $data['age'] < $minimumAge) {
+                $validator->errors()->add('age', $minimumAgeMessage);
+            }
+        });
+    }
+
+    private function minimumAgeForCurrentUser(): int
+    {
+        $gender = $this->user()?->gender;
+
+        return app(SystemSettingService::class)->getMinimumAgeForGender($gender);
+    }
+
+    private function minimumAgeMessage(int $minimumAge): string
+    {
+        $gender = $this->user()?->gender;
+        $genderValue = $gender instanceof Gender ? $gender->value : strtolower((string) $gender);
+        $genderLabel = $genderValue === Gender::Female->value
+            ? 'female'
+            : ($genderValue === Gender::Male->value ? 'male' : 'selected');
+
+        return "Minimum allowed age for {$genderLabel} members is {$minimumAge} years.";
     }
 }

@@ -4,12 +4,15 @@ namespace App\Http\Requests\Api;
 
 use App\Enums\BodyType;
 use App\Enums\EmploymentStatus;
+use App\Enums\Gender;
 use App\Enums\MaritalStatus;
 use App\Enums\Religion;
 use App\Enums\SkinTone;
 use App\Models\Country;
 use App\Models\District;
 use App\Models\Region;
+use App\Services\SystemSettingService;
+use Carbon\Carbon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -29,7 +32,8 @@ class UpsertProfileRequest extends FormRequest
     {
         return [
             'display_name' => ['required', 'string', 'max:100'],
-            'age' => ['required', 'integer', 'min:18', 'max:80'],
+            'date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'age' => ['nullable', 'integer', 'min:1', 'max:100'],
             'country_id' => ['required', 'integer', 'exists:countries,id'],
             'region_id' => ['nullable', 'integer', 'exists:regions,id'],
             'district_id' => ['nullable', 'integer', 'exists:districts,id'],
@@ -58,6 +62,23 @@ class UpsertProfileRequest extends FormRequest
         $validator->after(function (Validator $validator): void {
             /** @var array<string, mixed> $data */
             $data = $this->all();
+            $minimumAge = $this->minimumAgeForCurrentUser();
+            $minimumAgeMessage = $this->minimumAgeMessage($minimumAge);
+
+            if (empty($data['date_of_birth']) && ! isset($data['age'])) {
+                $validator->errors()->add('date_of_birth', 'Date of birth is required.');
+            } elseif (! empty($data['date_of_birth'])) {
+                try {
+                    $calculatedAge = Carbon::parse((string) $data['date_of_birth'])->age;
+                    if ($calculatedAge < $minimumAge) {
+                        $validator->errors()->add('date_of_birth', $minimumAgeMessage);
+                    }
+                } catch (\Throwable) {
+                    // Date format validation is handled by the date rule.
+                }
+            } elseif ((int) $data['age'] < $minimumAge) {
+                $validator->errors()->add('age', $minimumAgeMessage);
+            }
 
             $countryId = $data['country_id'] ?? null;
             $regionId = $data['region_id'] ?? null;
@@ -118,5 +139,23 @@ class UpsertProfileRequest extends FormRequest
                 }
             }
         });
+    }
+
+    private function minimumAgeForCurrentUser(): int
+    {
+        $gender = $this->user()?->gender;
+
+        return app(SystemSettingService::class)->getMinimumAgeForGender($gender);
+    }
+
+    private function minimumAgeMessage(int $minimumAge): string
+    {
+        $gender = $this->user()?->gender;
+        $genderValue = $gender instanceof Gender ? $gender->value : strtolower((string) $gender);
+        $genderLabel = $genderValue === Gender::Female->value
+            ? 'female'
+            : ($genderValue === Gender::Male->value ? 'male' : 'selected');
+
+        return "Minimum allowed age for {$genderLabel} members is {$minimumAge} years.";
     }
 }

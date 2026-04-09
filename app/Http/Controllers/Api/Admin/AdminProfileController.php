@@ -83,6 +83,7 @@ class AdminProfileController extends ApiController
             'user_id' => $profile->user_id,
             'display_name' => $profile->display_name,
             'age' => $profile->age,
+            'date_of_birth' => $profile->date_of_birth?->toDateString(),
             'country' => $profile->country ? [
                 'id' => $profile->country->id,
                 'name' => $profile->country->name,

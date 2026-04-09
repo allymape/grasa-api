@@ -8,6 +8,7 @@ use App\Http\Requests\StoreReportRequest;
 use App\Models\ConnectionRequest;
 use App\Models\Profile;
 use App\Models\Report;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
@@ -17,7 +18,7 @@ class BrowseProfileController extends Controller
 {
     public function index(Request $request): View
     {
-        $profiles = Profile::query()
+        $profilesQuery = Profile::query()
             ->with([
                 'user',
                 'photos' => fn ($query) => $query->orderByDesc('is_primary')->orderBy('sort_order'),
@@ -28,12 +29,18 @@ class BrowseProfileController extends Controller
             ->when($request->filled('gender'), function ($query) use ($request) {
                 $query->whereHas('user', fn ($userQuery) => $userQuery->where('gender', (string) $request->input('gender')));
             })
-            ->when($request->filled('min_age'), fn ($query) => $query->where('age', '>=', (int) $request->integer('min_age')))
-            ->when($request->filled('max_age'), fn ($query) => $query->where('age', '<=', (int) $request->integer('max_age')))
             ->when($request->filled('region'), fn ($query) => $query->where('region', (string) $request->input('region')))
             ->when($request->filled('religion'), fn ($query) => $query->where('religion', (string) $request->input('religion')))
             ->when($request->filled('marital_status'), fn ($query) => $query->where('marital_status', (string) $request->input('marital_status')))
-            ->when($request->filled('has_children'), fn ($query) => $query->where('has_children', $request->boolean('has_children')))
+            ->when($request->filled('has_children'), fn ($query) => $query->where('has_children', $request->boolean('has_children')));
+
+        $this->applyAgeFilters(
+            $profilesQuery,
+            $request->filled('min_age') ? (int) $request->integer('min_age') : null,
+            $request->filled('max_age') ? (int) $request->integer('max_age') : null
+        );
+
+        $profiles = $profilesQuery
             ->latest('id')
             ->paginate(12)
             ->withQueryString();
@@ -82,5 +89,28 @@ class BrowseProfileController extends Controller
         ]);
 
         return Redirect::back()->with('status', 'report-submitted');
+    }
+
+    private function applyAgeFilters(Builder $query, ?int $minAge, ?int $maxAge): void
+    {
+        if ($minAge === null && $maxAge === null) {
+            return;
+        }
+
+        $driver = $query->getConnection()->getDriverName();
+        $ageExpression = match ($driver) {
+            'mysql' => 'COALESCE(TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()), age)',
+            'pgsql' => 'COALESCE(EXTRACT(YEAR FROM age(CURRENT_DATE, date_of_birth))::int, age)',
+            'sqlite' => "COALESCE((CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', date_of_birth) AS INTEGER) - (strftime('%m-%d', 'now') < strftime('%m-%d', date_of_birth))), age)",
+            default => 'age',
+        };
+
+        if ($minAge !== null) {
+            $query->whereRaw("{$ageExpression} >= ?", [$minAge]);
+        }
+
+        if ($maxAge !== null) {
+            $query->whereRaw("{$ageExpression} <= ?", [$maxAge]);
+        }
     }
 }

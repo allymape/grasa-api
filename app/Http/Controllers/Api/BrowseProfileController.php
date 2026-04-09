@@ -11,6 +11,7 @@ use App\Models\ConnectionRequest;
 use App\Models\Profile;
 use App\Services\ConnectionPaymentService;
 use App\Services\ProfileVisibilityService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -45,8 +46,10 @@ class BrowseProfileController extends ApiController
         ]);
 
         $countryIso2 = isset($validated['country_iso2']) ? strtoupper((string) $validated['country_iso2']) : null;
+        $minAge = isset($validated['min_age']) ? (int) $validated['min_age'] : null;
+        $maxAge = isset($validated['max_age']) ? (int) $validated['max_age'] : null;
 
-        $profiles = Profile::query()
+        $profilesQuery = Profile::query()
             ->with([
                 'user:id,first_name,last_name,phone,email,gender',
                 'photos' => fn ($query) => $query->orderByDesc('is_primary')->orderBy('sort_order'),
@@ -60,15 +63,17 @@ class BrowseProfileController extends ApiController
             ->when(isset($validated['gender']), function ($query) use ($validated) {
                 $query->whereHas('user', fn ($userQuery) => $userQuery->where('gender', (string) $validated['gender']));
             })
-            ->when(isset($validated['min_age']), fn ($query) => $query->where('age', '>=', (int) $validated['min_age']))
-            ->when(isset($validated['max_age']), fn ($query) => $query->where('age', '<=', (int) $validated['max_age']))
             ->when(isset($validated['country_id']), fn ($query) => $query->where('country_id', (int) $validated['country_id']))
             ->when($countryIso2, fn ($query) => $query->whereHas('country', fn ($countryQuery) => $countryQuery->where('iso2', $countryIso2)))
             ->when(isset($validated['region_id']), fn ($query) => $query->where('region_id', (int) $validated['region_id']))
             ->when(isset($validated['district_id']), fn ($query) => $query->where('district_id', (int) $validated['district_id']))
             ->when(isset($validated['religion']), fn ($query) => $query->where('religion', (string) $validated['religion']))
             ->when(isset($validated['marital_status']), fn ($query) => $query->where('marital_status', (string) $validated['marital_status']))
-            ->when(array_key_exists('has_children', $validated), fn ($query) => $query->where('has_children', (bool) $validated['has_children']))
+            ->when(array_key_exists('has_children', $validated), fn ($query) => $query->where('has_children', (bool) $validated['has_children']));
+
+        $this->applyAgeFilters($profilesQuery, $minAge, $maxAge);
+
+        $profiles = $profilesQuery
             ->latest('id')
             ->paginate((int) ($validated['per_page'] ?? 12))
             ->withQueryString();
@@ -284,5 +289,28 @@ class BrowseProfileController extends ApiController
             'request' => $isActive ? $summary : null,
             'latest_request' => $isActive ? null : $summary,
         ];
+    }
+
+    private function applyAgeFilters(Builder $query, ?int $minAge, ?int $maxAge): void
+    {
+        if ($minAge === null && $maxAge === null) {
+            return;
+        }
+
+        $driver = $query->getConnection()->getDriverName();
+        $ageExpression = match ($driver) {
+            'mysql' => 'COALESCE(TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()), age)',
+            'pgsql' => 'COALESCE(EXTRACT(YEAR FROM age(CURRENT_DATE, date_of_birth))::int, age)',
+            'sqlite' => "COALESCE((CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', date_of_birth) AS INTEGER) - (strftime('%m-%d', 'now') < strftime('%m-%d', date_of_birth))), age)",
+            default => 'age',
+        };
+
+        if ($minAge !== null) {
+            $query->whereRaw("{$ageExpression} >= ?", [$minAge]);
+        }
+
+        if ($maxAge !== null) {
+            $query->whereRaw("{$ageExpression} <= ?", [$maxAge]);
+        }
     }
 }

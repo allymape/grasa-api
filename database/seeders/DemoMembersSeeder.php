@@ -18,6 +18,7 @@ use App\Models\User;
 use Faker\Factory;
 use Faker\Generator;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -204,7 +205,11 @@ class DemoMembersSeeder extends Seeder
                 $employmentStatus = $employmentPlan[$index] ?? EmploymentStatus::Employed->value;
                 $maritalStatus = $maritalPlan[$index] ?? MaritalStatus::Single->value;
                 $hasChildren = $this->hasChildrenForMaritalStatus($maritalStatus, $index);
-                $age = $this->ageFromBucket($ageBucketPlan[$index] ?? '31-35');
+                $plannedAge = $this->ageFromBucket($ageBucketPlan[$index] ?? '31-35');
+                $dateOfBirth = Carbon::today()
+                    ->subYears($plannedAge)
+                    ->subDays($this->faker->numberBetween(0, 364));
+                $age = $dateOfBirth->age;
                 $religion = $religionPlan[$index] ?? Religion::Christian->value;
 
                 $user = User::query()->create([
@@ -223,6 +228,7 @@ class DemoMembersSeeder extends Seeder
                     ->create([
                         'display_name' => $member['first_name'].' '.$member['last_name'],
                         'age' => $age,
+                        'date_of_birth' => $dateOfBirth->toDateString(),
                         'country_id' => $location['country_id'],
                         'region_id' => $location['region_id'],
                         'district_id' => $location['district_id'],

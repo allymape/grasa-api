@@ -7,6 +7,7 @@ use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\Profile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
@@ -26,6 +27,19 @@ class ProfileController extends Controller
     {
         $user = $request->user();
         $validated = $request->validated();
+
+        $dateOfBirth = isset($validated['date_of_birth']) && $validated['date_of_birth'] !== null
+            ? Carbon::parse((string) $validated['date_of_birth'])->toDateString()
+            : null;
+
+        if (! $dateOfBirth && isset($validated['age'])) {
+            $dateOfBirth = Carbon::today()->subYears((int) $validated['age'])->toDateString();
+        }
+
+        if ($dateOfBirth) {
+            $validated['date_of_birth'] = $dateOfBirth;
+            $validated['age'] = Carbon::parse($dateOfBirth)->age;
+        }
 
         $validated['has_children'] = (bool) ($validated['has_children'] ?? false);
         $validated['children_count'] = $validated['has_children'] ? (int) $validated['children_count'] : 0;

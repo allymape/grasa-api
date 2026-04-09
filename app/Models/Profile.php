@@ -8,6 +8,7 @@ use App\Enums\MaritalStatus;
 use App\Enums\ProfileApprovalStatus;
 use App\Enums\Religion;
 use App\Enums\SkinTone;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,7 @@ class Profile extends Model
         'user_id',
         'display_name',
         'age',
+        'date_of_birth',
         'country_id',
         'region_id',
         'district_id',
@@ -57,6 +59,7 @@ class Profile extends Model
             'religion' => Religion::class,
             'body_type' => BodyType::class,
             'skin_tone' => SkinTone::class,
+            'date_of_birth' => 'date',
             'has_children' => 'boolean',
             'is_profile_complete' => 'boolean',
             'is_visible' => 'boolean',
@@ -93,5 +96,14 @@ class Profile extends Model
     public function photos(): HasMany
     {
         return $this->hasMany(ProfilePhoto::class);
+    }
+
+    public function getAgeAttribute(mixed $value): int
+    {
+        if ($this->date_of_birth) {
+            return Carbon::parse($this->date_of_birth)->age;
+        }
+
+        return max(18, (int) ($value ?? 18));
     }
 }

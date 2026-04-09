@@ -16,7 +16,7 @@ class AdminUserController extends ApiController
         $users = User::query()
             ->withTrashed()
             ->with([
-                'profile:id,user_id,display_name,approval_status,is_visible,is_profile_complete',
+                'profile:id,user_id,display_name,age,date_of_birth,approval_status,is_visible,is_profile_complete',
             ])
             ->withCount([
                 'sentConnectionRequests as sent_requests_count',
@@ -204,7 +204,7 @@ class AdminUserController extends ApiController
     {
         return User::query()
             ->withTrashed()
-            ->with('profile:id,user_id,display_name,approval_status,is_visible,is_profile_complete')
+            ->with('profile:id,user_id,display_name,age,date_of_birth,approval_status,is_visible,is_profile_complete')
             ->find($userId);
     }
 
@@ -231,6 +231,8 @@ class AdminUserController extends ApiController
             'profile' => $user->profile ? [
                 'id' => $user->profile->id,
                 'display_name' => $user->profile->display_name,
+                'age' => (int) $user->profile->age,
+                'date_of_birth' => $user->profile->date_of_birth?->toDateString(),
                 'approval_status' => $user->profile->approval_status?->value ?? $user->profile->approval_status,
                 'is_visible' => (bool) $user->profile->is_visible,
                 'is_profile_complete' => (bool) $user->profile->is_profile_complete,

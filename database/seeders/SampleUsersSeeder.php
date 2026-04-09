@@ -53,6 +53,7 @@ class SampleUsersSeeder extends Seeder
             [
                 'display_name' => 'Aisha M',
                 'age' => 27,
+                'date_of_birth' => '1999-03-14',
                 'country_id' => $tz->id,
                 'region_id' => $tzRegion?->id,
                 'district_id' => $tzDistrict?->id,
@@ -79,6 +80,7 @@ class SampleUsersSeeder extends Seeder
             [
                 'display_name' => 'Brian M',
                 'age' => 30,
+                'date_of_birth' => '1995-08-22',
                 'country_id' => $ke->id,
                 'region_id' => null,
                 'district_id' => null,
